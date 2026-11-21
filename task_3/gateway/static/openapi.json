@@ -1,0 +1,205 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ВышBuild API",
+    "version": "1.0.0",
+    "description": "Сдача исходников, синхронная проверка и отчёты по домашним работам."
+  },
+  "servers": [{"url": "/"}],
+  "paths": {
+    "/submissions": {
+      "post": {
+        "tags": ["Сдачи"],
+        "summary": "Загрузить и проверить работу",
+        "description": "201 означает, что сдача и отчёт созданы. Результат эвристики указан в report.success. Если файл сохранён, а сервис анализа не ответил, ошибка содержит submission_id для повторного запуска.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["student_id", "assignment_id", "file"],
+                "properties": {
+                  "student_id": {"$ref": "#/components/schemas/Identifier"},
+                  "assignment_id": {"$ref": "#/components/schemas/Identifier"},
+                  "file": {"type": "string", "format": "binary", "description": ".py или .zip, до 5 МиБ"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Сдача и отчёт созданы",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SubmissionResult"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "413": {"$ref": "#/components/responses/TooLarge"},
+          "502": {"$ref": "#/components/responses/UpstreamError"},
+          "503": {"$ref": "#/components/responses/Unavailable"},
+          "504": {"$ref": "#/components/responses/Timeout"}
+        }
+      }
+    },
+    "/submissions/{submission_id}/report": {
+      "get": {
+        "tags": ["Отчёты"],
+        "summary": "Получить отчёт по сдаче",
+        "parameters": [{"$ref": "#/components/parameters/SubmissionId"}],
+        "responses": {
+          "200": {"$ref": "#/components/responses/Report"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "502": {"$ref": "#/components/responses/UpstreamError"},
+          "503": {"$ref": "#/components/responses/Unavailable"},
+          "504": {"$ref": "#/components/responses/Timeout"}
+        }
+      }
+    },
+    "/submissions/{submission_id}/analysis": {
+      "post": {
+        "tags": ["Сдачи"],
+        "summary": "Запустить анализ сохранённой сдачи",
+        "description": "Если отчёт уже существует, возвращает его. Повторная загрузка файла не требуется.",
+        "parameters": [{"$ref": "#/components/parameters/SubmissionId"}],
+        "responses": {
+          "200": {"$ref": "#/components/responses/Report"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "502": {"$ref": "#/components/responses/UpstreamError"},
+          "503": {"$ref": "#/components/responses/Unavailable"},
+          "504": {"$ref": "#/components/responses/Timeout"}
+        }
+      }
+    },
+    "/assignments/{assignment_id}/reports": {
+      "get": {
+        "tags": ["Отчёты"],
+        "summary": "Получить отчёты и сводку по заданию",
+        "description": "Сдачи отсортированы от новых к старым. Если анализ ещё не дал отчёт, у сдачи статус no_report. Для задания без сдач возвращаются пустой список и нулевые счётчики.",
+        "parameters": [
+          {"name": "assignment_id", "in": "path", "required": true, "schema": {"$ref": "#/components/schemas/Identifier"}, "example": "hw-3"}
+        ],
+        "responses": {
+          "200": {
+            "description": "Сдачи задания и сводка",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AssignmentReports"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "502": {"$ref": "#/components/responses/UpstreamError"},
+          "503": {"$ref": "#/components/responses/Unavailable"},
+          "504": {"$ref": "#/components/responses/Timeout"}
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Состояние"],
+        "summary": "Проверить доступность Gateway",
+        "responses": {
+          "200": {
+            "description": "Gateway отвечает",
+            "content": {"application/json": {"schema": {"type": "object", "properties": {"status": {"type": "string", "enum": ["ok"]}}}}}
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "SubmissionId": {"name": "submission_id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+    },
+    "responses": {
+      "Report": {
+        "description": "Отчёт о проверке",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Report"}}}
+      },
+      "BadRequest": {"description": "Неверные или отсутствующие поля запроса", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "TooLarge": {"description": "Файл превышает 5 МиБ или превышены лимиты формы", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "NotFound": {"description": "Сдача или отчёт отсутствуют", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "UpstreamError": {"description": "Внутренний сервис вернул ошибку или некорректный ответ", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "Unavailable": {"description": "Внутренний сервис недоступен", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "Timeout": {"description": "Внутренний сервис не ответил вовремя", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+    },
+    "schemas": {
+      "Identifier": {"type": "string", "minLength": 1, "maxLength": 100, "description": "Печатные символы, кроме прямой и обратной косой черты."},
+      "Submission": {
+        "type": "object",
+        "required": ["submission_id", "student_id", "assignment_id", "filename", "size_bytes", "submitted_at"],
+        "properties": {
+          "submission_id": {"type": "string", "format": "uuid"},
+          "student_id": {"$ref": "#/components/schemas/Identifier"},
+          "assignment_id": {"$ref": "#/components/schemas/Identifier"},
+          "filename": {"type": "string"},
+          "size_bytes": {"type": "integer", "minimum": 0},
+          "submitted_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Report": {
+        "type": "object",
+        "required": ["submission_id", "assignment_id", "status", "success", "details", "checked_at"],
+        "properties": {
+          "submission_id": {"type": "string", "format": "uuid"},
+          "assignment_id": {"$ref": "#/components/schemas/Identifier"},
+          "status": {"type": "string", "enum": ["passed", "failed"]},
+          "success": {"type": "boolean"},
+          "details": {"type": "string"},
+          "checked_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "SubmissionResult": {
+        "type": "object",
+        "required": ["submission", "report"],
+        "properties": {
+          "submission": {"$ref": "#/components/schemas/Submission"},
+          "report": {"$ref": "#/components/schemas/Report"}
+        }
+      },
+      "AssignmentReports": {
+        "type": "object",
+        "required": ["assignment_id", "summary", "submissions"],
+        "properties": {
+          "assignment_id": {"$ref": "#/components/schemas/Identifier"},
+          "summary": {
+            "type": "object",
+            "required": ["total", "passed", "failed", "no_report"],
+            "properties": {
+              "total": {"type": "integer", "minimum": 0},
+              "passed": {"type": "integer", "minimum": 0},
+              "failed": {"type": "integer", "minimum": 0},
+              "no_report": {"type": "integer", "minimum": 0}
+            }
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["submission", "status", "report"],
+              "properties": {
+                "submission": {"$ref": "#/components/schemas/Submission"},
+                "status": {"type": "string", "enum": ["passed", "failed", "no_report"]},
+                "report": {
+                  "description": "Сохранённый отчёт или null при статусе no_report.",
+                  "oneOf": [{"$ref": "#/components/schemas/Report"}, {"type": "object", "nullable": true, "enum": [null]}]
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["message"],
+            "properties": {
+              "message": {"type": "string"},
+              "service": {"type": "string", "enum": ["store", "analysis"]},
+              "submission_id": {"type": "string", "format": "uuid", "description": "ID сохранённой сдачи при сбое анализа или ID из запроса на повторный запуск."}
+            }
+          }
+        }
+      }
+    }
+  }
+}

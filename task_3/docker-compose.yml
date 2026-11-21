@@ -1,0 +1,55 @@
+x-healthcheck: &healthcheck
+  interval: 5s
+  timeout: 3s
+  retries: 5
+
+services:
+  store:
+    build:
+      context: .
+      dockerfile: store/Dockerfile
+    environment:
+      STORE_DATA_DIR: /data
+    volumes:
+      - store-data:/data
+    healthcheck:
+      <<: *healthcheck
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://127.0.0.1:8001/health', timeout=2).close()"]
+
+  analysis:
+    build:
+      context: .
+      dockerfile: analysis/Dockerfile
+    environment:
+      ANALYSIS_DATA_DIR: /data
+      STORE_URL: http://store:8001
+    volumes:
+      - analysis-data:/data
+    depends_on:
+      store:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://127.0.0.1:8002/health', timeout=2).close()"]
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    environment:
+      STORE_URL: http://store:8001
+      ANALYSIS_URL: http://analysis:8002
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      store:
+        condition: service_healthy
+      analysis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2).close()"]
+
+volumes:
+  store-data:
+  analysis-data:

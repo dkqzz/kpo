@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ВышBuild</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <h1>ВышBuild</h1>
+      <a href="{{ url_for('swagger') }}">Swagger API</a>
+    </header>
+
+    <div class="workspace">
+      <section class="panel" aria-labelledby="upload-title">
+        <h2 id="upload-title">Сдать работу</h2>
+        <form id="upload-form" action="{{ url_for('submit') }}" method="post" enctype="multipart/form-data">
+          <label for="student-id">ID студента</label>
+          <input id="student-id" name="student_id" placeholder="student-01" maxlength="100" required>
+          <label for="upload-assignment">ID задания</label>
+          <input id="upload-assignment" name="assignment_id" placeholder="hw-3" maxlength="100" required>
+          <label for="artifact">Файл</label>
+          <input id="artifact" name="file" type="file" accept=".py,.zip" aria-describedby="file-hint" required>
+          <small id="file-hint">Файл .py или ZIP с Python-проектом, до 5 МиБ</small>
+          <button type="submit">Проверить работу</button>
+        </form>
+        <p id="upload-status" class="feedback" role="status" hidden></p>
+      </section>
+
+      <section class="panel" aria-labelledby="reports-title">
+        <h2 id="reports-title">Отчёты по заданию</h2>
+        <form id="reports-form" class="filter">
+          <div>
+            <label for="report-assignment">ID задания</label>
+            <input id="report-assignment" name="assignment_id" placeholder="hw-3" maxlength="100" required>
+          </div>
+          <button type="submit" class="secondary">Показать</button>
+        </form>
+        <p id="reports-status" class="feedback" role="status">Введите ID задания, чтобы увидеть сдачи.</p>
+        <dl id="summary" class="summary" hidden>
+          <div><dt>Всего</dt><dd id="total">0</dd></div>
+          <div><dt>Прошли</dt><dd id="passed">0</dd></div>
+          <div><dt>Не прошли</dt><dd id="failed">0</dd></div>
+          <div><dt>Без отчёта</dt><dd id="no_report">0</dd></div>
+        </dl>
+        <ul id="report-list" class="reports" aria-label="Сдачи задания" aria-busy="false"></ul>
+      </section>
+    </div>
+  </main>
+
+  <template id="report-template">
+    <li class="report">
+      <div class="report-heading">
+        <strong data-field="student"></strong>
+        <span class="badge" data-field="status"></span>
+      </div>
+      <p class="report-meta" data-field="artifact"></p>
+      <p class="details" data-field="details"></p>
+      <button type="button" class="secondary retry" hidden>Повторить анализ</button>
+    </li>
+  </template>
+</body>
+</html>
